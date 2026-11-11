@@ -5,7 +5,7 @@ import { getNotifications } from "@/services/admin";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { NotificationActions } from "@/components/admin/notification-actions";
-import { Bell, UserPlus, Droplet, AlertTriangle, CheckCircle } from "lucide-react";
+import { Bell, UserPlus, Droplet, AlertTriangle, CheckCircle, Mail } from "lucide-react";
 import { PAGINATION } from "@/config/constants";
 
 export const metadata: Metadata = {
@@ -25,6 +25,7 @@ const typeIcons: Record<string, React.ComponentType<{ className?: string }>> = {
   DONOR_UPDATED: UserPlus,
   REQUEST_STATUS_CHANGED: CheckCircle,
   CONTENT_PUBLISHED: Bell,
+  CONTACT_MESSAGE: Mail,
 };
 
 const typeColors: Record<string, string> = {
@@ -34,6 +35,7 @@ const typeColors: Record<string, string> = {
   DONOR_UPDATED: "bg-purple-100 text-purple-700",
   REQUEST_STATUS_CHANGED: "bg-orange-100 text-orange-700",
   CONTENT_PUBLISHED: "bg-gray-100 text-gray-700",
+  CONTACT_MESSAGE: "bg-sky-100 text-sky-700",
 };
 
 export default async function NotificationsPage({ searchParams }: NotificationsPageProps) {
@@ -96,7 +98,7 @@ export default async function NotificationsPage({ searchParams }: NotificationsP
                           </Badge>
                         )}
                       </div>
-                      <p className="text-sm text-gray-600">{notification.message}</p>
+                      <p className="whitespace-pre-line text-sm text-gray-600">{notification.message}</p>
                       <p className="text-xs text-gray-400 mt-2">
                         {format(new Date(notification.createdAt), "dd MMM yyyy, HH:mm")}
                       </p>

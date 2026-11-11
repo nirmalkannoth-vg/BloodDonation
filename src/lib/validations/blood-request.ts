@@ -24,21 +24,23 @@ export const bloodRequestSchema = z.object({
     .int("Age must be a whole number")
     .min(1, "Please enter a valid age")
     .max(120, "Please enter a valid age"),
-  bloodGroupId: z.string().uuid("Please select a blood group required"),
+  bloodGroupId: z.string().uuid("Please select the blood group needed"),
   willToDonate: z
     .boolean()
     .refine((val) => val === true, {
-      message: "You must confirm willingness to donate",
+      message: "Please confirm so our team can contact you",
     }),
   phone: phoneSchema,
   isItEmployee: z.boolean({ required_error: "Please indicate if you are an IT employee" }),
   companyName: z
     .string()
-    .min(1, "Company name is required")
-    .max(255, "Company name must be less than 255 characters"),
+    .trim()
+    .max(255, "Company name must be less than 255 characters")
+    .optional(),
   reason: z
     .string()
-    .min(1, "Reason for request is required")
+    .trim()
+    .min(1, "Please tell us why blood is needed")
     .max(500, "Reason must be less than 500 characters"),
   isUrgent: z.boolean().optional(),
 });

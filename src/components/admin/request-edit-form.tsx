@@ -28,7 +28,7 @@ const requestEditSchema = z.object({
   phone: z.string().min(1, "Phone number is required"),
   bloodGroupId: z.string().uuid("Please select a blood group"),
   isItEmployee: z.boolean(),
-  companyName: z.string().min(1, "Company name is required"),
+  companyName: z.string().trim().max(255, "Company name must be less than 255 characters"),
   reason: z.string().min(1, "Reason is required"),
   isUrgent: z.boolean(),
   willToDonate: z.boolean(),
@@ -206,7 +206,7 @@ export function RequestEditForm({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="companyName">Company Name *</Label>
+            <Label htmlFor="companyName">Company Name <span className="font-normal text-gray-500">(optional)</span></Label>
             <Input id="companyName" className="bg-white" {...register("companyName")} />
             {errors.companyName && <p className="text-sm text-red-600">{errors.companyName.message}</p>}
           </div>

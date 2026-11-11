@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
+import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { bloodRequestSchema, type BloodRequestInput } from "@/lib/validations/blood-request";
@@ -10,59 +11,134 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import { cn } from "@/lib/utils";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Loader2, CheckCircle2, Copy } from "lucide-react";
+  BloodGroupPicker,
+  Field,
+  FieldError,
+  FormProgressHeader,
+  FormSection,
+  ItEmployeePicker,
+  PhonePrefix,
+  digitsOnlyPhone,
+  inputClass,
+  isValidPhone,
+  type BloodGroupOption,
+} from "./form-parts";
+import {
+  ArrowRight,
+  CalendarDays,
+  CheckCircle2,
+  ClipboardList,
+  Copy,
+  Droplet,
+  Loader2,
+  Lock,
+  Phone,
+  Send,
+  Share2,
+  Siren,
+  User,
+} from "lucide-react";
 import { toast } from "sonner";
 
-interface BloodGroup {
-  id: string;
-  name: string;
-  displayName: string;
+interface BloodRequestFormProps {
+  bloodGroups: BloodGroupOption[];
+  contactPhone?: string;
 }
 
-interface BloodRequestFormProps {
-  bloodGroups: BloodGroup[];
-  contactPhone?: string;
+/** One-tap starters for the "reason" field. */
+const REASONS = [
+  "Surgery",
+  "Accident / Trauma",
+  "Pregnancy / Delivery",
+  "Cancer treatment",
+  "Dengue / Low platelets",
+  "Thalassemia",
+  "Anaemia",
+  "Dialysis",
+];
+
+const REASON_MAX = 500;
+
+interface Submitted {
+  referenceNumber: string;
+  bloodGroup: string;
+  urgent: boolean;
 }
 
 export function BloodRequestForm({ bloodGroups, contactPhone = "+91 1234567890" }: BloodRequestFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [referenceNumber, setReferenceNumber] = useState<string | null>(null);
-  const [bgDisplay, setBgDisplay] = useState("");
+  const [submitted, setSubmitted] = useState<Submitted | null>(null);
+  const topRef = useRef<HTMLDivElement>(null);
+  const contactPhoneTel = contactPhone.replace(/[^\d+]/g, "");
 
   const {
     register,
     handleSubmit,
     setValue,
     watch,
+    reset,
     formState: { errors },
   } = useForm<BloodRequestInput>({
     resolver: zodResolver(bloodRequestSchema),
     defaultValues: {
+      firstName: "",
+      lastName: "",
+      phone: "",
+      companyName: "",
+      reason: "",
       willToDonate: false,
       isItEmployee: true,
       isUrgent: false,
     },
   });
 
-  const willToDonateValue = watch("willToDonate");
-  const isItEmployeeValue = watch("isItEmployee");
-  const isUrgentValue = watch("isUrgent");
+  const values = watch();
+  const phoneField = register("phone");
+  const reason = values.reason ?? "";
+
+  const sections = {
+    need: !!values.bloodGroupId,
+    reason: reason.trim().length > 0,
+    details:
+      !!values.firstName?.trim() &&
+      !!values.lastName?.trim() &&
+      Number.isFinite(values.age) &&
+      isValidPhone(values.phone),
+    consent: values.willToDonate === true,
+  };
+  const completed = Object.values(sections).filter(Boolean).length;
+
+  const pickReason = (chip: string) => {
+    const current = reason.trim();
+    // Replace an untouched chip; otherwise put the chip in front of what the user typed
+    const next =
+      !current || REASONS.includes(current)
+        ? chip
+        : current.startsWith(chip)
+          ? current
+          : `${chip} – ${current}`;
+    setValue("reason", next.slice(0, REASON_MAX), { shouldValidate: true });
+  };
+
+  const scrollToTop = () =>
+    requestAnimationFrame(() =>
+      topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+    );
 
   const onSubmit = async (data: BloodRequestInput) => {
     setIsSubmitting(true);
     try {
       const result = await submitBloodRequest(data);
       if (result.success && result.referenceNumber) {
-        setReferenceNumber(result.referenceNumber);
+        setSubmitted({
+          referenceNumber: result.referenceNumber,
+          bloodGroup: bloodGroups.find((b) => b.id === data.bloodGroupId)?.displayName ?? "",
+          urgent: data.isUrgent === true,
+        });
         toast.success("Blood request submitted successfully!");
+        scrollToTop();
       } else {
         toast.error(result.error || "Failed to submit request");
       }
@@ -73,288 +149,416 @@ export function BloodRequestForm({ bloodGroups, contactPhone = "+91 1234567890" 
     }
   };
 
-  const copyReferenceNumber = () => {
-    if (referenceNumber) {
-      navigator.clipboard.writeText(referenceNumber);
-      toast.success("Reference number copied!");
-    }
-  };
+  /* ------------------------------ Success view ------------------------------ */
 
-  if (referenceNumber) {
+  if (submitted) {
+    const copyReference = async () => {
+      try {
+        await navigator.clipboard.writeText(submitted.referenceNumber);
+        toast.success("Reference number copied!");
+      } catch {
+        toast.error("Couldn't copy — please note it down.");
+      }
+    };
+
+    const shareText = `${submitted.urgent ? "URGENT: " : ""}${submitted.bloodGroup} blood needed. Request ref ${submitted.referenceNumber} with Blood Connect – InfoPark News Initiate, Kochi. If you can donate, please call ${contactPhone}.`;
+
     return (
-      <Card className="max-w-2xl mx-auto">
-        <CardContent className="pt-12 pb-12 text-center">
-          <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
-            <CheckCircle2 className="w-8 h-8 text-green-600" />
+      <div
+        ref={topRef}
+        className="overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-xl shadow-gray-200/60"
+      >
+        <div className="bg-gradient-to-br from-emerald-50 to-white px-6 pb-8 pt-12 text-center sm:px-10">
+          <div className="relative mx-auto mb-6 h-20 w-20">
+            <span className="absolute inset-0 animate-ping rounded-full bg-emerald-200 opacity-60" />
+            <span className="relative flex h-20 w-20 items-center justify-center rounded-full bg-emerald-500 text-white shadow-lg shadow-emerald-500/30">
+              <CheckCircle2 className="h-10 w-10" />
+            </span>
           </div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">
-            Request Submitted Successfully!
+          <h2 className="font-display text-4xl font-bold uppercase tracking-wide text-gray-900">
+            Request received
           </h2>
-          <p className="text-gray-600 mb-6">
-            Our team will review your request and contact you shortly.
+          <p className="mx-auto mt-3 max-w-md text-gray-600">
+            Our team is looking for a matching{" "}
+            <span className="font-semibold text-primary">{submitted.bloodGroup}</span> donor and will call
+            you shortly. Please keep your phone reachable.
           </p>
+        </div>
 
-          <div className="bg-gray-50 p-6 rounded-lg mb-6">
-            <p className="text-sm text-gray-500 mb-2">Your Reference Number</p>
-            <div className="flex items-center justify-center gap-2">
-              <p className="text-2xl font-mono font-bold text-primary">
-                {referenceNumber}
+        <div className="space-y-6 px-6 pb-10 sm:px-10">
+          <div className="rounded-2xl border-2 border-dashed border-gray-200 bg-gray-50 p-5 text-center">
+            <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+              Your reference number
+            </p>
+            <div className="mt-2 flex items-center justify-center gap-2">
+              <p className="font-mono text-2xl font-bold tracking-wider text-primary sm:text-3xl">
+                {submitted.referenceNumber}
               </p>
               <Button
+                type="button"
                 variant="ghost"
                 size="icon"
-                onClick={copyReferenceNumber}
-                className="h-8 w-8"
+                onClick={copyReference}
+                aria-label="Copy reference number"
+                className="h-9 w-9 rounded-full"
               >
-                <Copy className="w-4 h-4" />
+                <Copy className="h-4 w-4" />
               </Button>
             </div>
-            <p className="text-xs text-gray-500 mt-2">
-              Please save this number for future reference
-            </p>
+            <p className="mt-2 text-xs text-gray-500">Mention this number when you call us.</p>
           </div>
 
-          <p className="text-sm text-gray-500">
-            For urgent assistance, please contact us directly at{" "}
-            <a href={`tel:${contactPhone.replace(/\s/g, "")}`} className="text-primary font-medium">
-              {contactPhone}
-            </a>
+          {submitted.urgent && (
+            <div className="flex flex-col items-start gap-3 rounded-2xl bg-red-50 p-4 text-sm text-red-800 sm:flex-row sm:items-center">
+              <Siren className="h-5 w-5 shrink-0 text-red-600" aria-hidden="true" />
+              <p className="flex-1">Marked as <strong>urgent</strong>. For faster help, call us right now.</p>
+              <Button asChild size="sm" className="rounded-lg">
+                <a href={`tel:${contactPhoneTel}`}>
+                  <Phone className="h-4 w-4" />
+                  Call now
+                </a>
+              </Button>
+            </div>
+          )}
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Button
+              asChild
+              size="lg"
+              className="h-12 rounded-xl bg-[#25D366] text-base font-semibold text-white hover:bg-[#1fb857]"
+            >
+              <a
+                href={`https://wa.me/?text=${encodeURIComponent(shareText)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <Share2 className="h-4 w-4" />
+                Share on WhatsApp
+              </a>
+            </Button>
+            <Button asChild size="lg" variant="outline" className="h-12 rounded-xl text-base font-semibold">
+              <a href={`tel:${contactPhoneTel}`}>
+                <Phone className="h-4 w-4" />
+                Call {contactPhone}
+              </a>
+            </Button>
+          </div>
+          <p className="-mt-3 text-center text-xs text-gray-500">
+            Sharing with friends and family helps find a donor faster.
           </p>
-        </CardContent>
-      </Card>
+
+          <div className="flex flex-col gap-3 border-t border-gray-100 pt-6 sm:flex-row">
+            <Button asChild variant="ghost" className="h-11 flex-1 rounded-xl font-semibold">
+              <Link href="/">Back to Home</Link>
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              className="h-11 flex-1 rounded-xl font-semibold"
+              onClick={() => {
+                reset();
+                setSubmitted(null);
+                scrollToTop();
+              }}
+            >
+              Submit another request
+            </Button>
+          </div>
+        </div>
+      </div>
     );
   }
 
+  /* -------------------------------- Form view ------------------------------- */
+
   return (
-    <Card className="max-w-2xl mx-auto">
-      <CardHeader>
-        <CardTitle>Blood Request Form</CardTitle>
-        <CardDescription>
-          All fields are required. Fill out the form below and our team will
-          contact you to arrange assistance.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+    <div
+      ref={topRef}
+      id="request-form"
+      className="scroll-mt-24 overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-xl shadow-gray-200/60"
+    >
+      <FormProgressHeader
+        title="Blood Request"
+        subtitle="3 quick steps. We'll call you back to arrange donors."
+        completed={completed}
+        total={4}
+      />
 
-          {/* Personal Information */}
-          <div className="space-y-4">
-            <h3 className="font-semibold text-gray-900">Your Details</h3>
+      <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-10 px-6 py-8 sm:px-8">
+        {/* 1. What is needed */}
+        <FormSection
+          step={1}
+          icon={Droplet}
+          title="What blood is needed?"
+          description="Pick the patient's blood group and how soon it's needed."
+          done={sections.need}
+        >
+          <Field label="Blood group required" error={errors.bloodGroupId?.message}>
+            <BloodGroupPicker
+              label="Blood group required"
+              bloodGroups={bloodGroups}
+              value={values.bloodGroupId}
+              onChange={(id) => setValue("bloodGroupId", id, { shouldValidate: true })}
+            />
+          </Field>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="firstName">First Name *</Label>
-                <Input
-                  id="firstName"
-                  placeholder="Enter first name"
-                  className="bg-white text-gray-900"
-                  {...register("firstName")}
-                />
-                {errors.firstName && (
-                  <p className="text-sm text-red-600">{errors.firstName.message}</p>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="lastName">Last Name *</Label>
-                <Input
-                  id="lastName"
-                  placeholder="Enter last name"
-                  className="bg-white text-gray-900"
-                  {...register("lastName")}
-                />
-                {errors.lastName && (
-                  <p className="text-sm text-red-600">{errors.lastName.message}</p>
-                )}
-              </div>
+          <Field label="How soon is it needed?">
+            <div role="radiogroup" aria-label="How soon is it needed?" className="grid grid-cols-2 gap-3">
+              {[
+                { urgent: false, icon: CalendarDays, title: "Planned", text: "Within a few days" },
+                { urgent: true, icon: Siren, title: "Urgent", text: "Needed today / emergency" },
+              ].map(({ urgent, icon: Icon, title, text }) => {
+                const selected = (values.isUrgent ?? false) === urgent;
+                return (
+                  <button
+                    key={title}
+                    type="button"
+                    role="radio"
+                    aria-checked={selected}
+                    onClick={() => setValue("isUrgent", urgent)}
+                    className={cn(
+                      "flex items-start gap-3 rounded-2xl border-2 p-4 text-left transition-all focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-primary/40",
+                      selected && urgent && "border-red-500 bg-red-50 shadow-md shadow-red-500/10",
+                      selected && !urgent && "border-primary bg-primary/5",
+                      !selected && "border-gray-200 bg-white hover:border-gray-300"
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "flex h-9 w-9 shrink-0 items-center justify-center rounded-full",
+                        selected ? "bg-primary text-white" : "bg-gray-100 text-gray-500",
+                        selected && urgent && "animate-pulse"
+                      )}
+                    >
+                      <Icon className="h-4 w-4" aria-hidden="true" />
+                    </span>
+                    <span>
+                      <span className={cn("block font-semibold", selected ? "text-primary" : "text-gray-900")}>
+                        {title}
+                      </span>
+                      <span className="block text-xs text-gray-500 sm:text-sm">{text}</span>
+                    </span>
+                  </button>
+                );
+              })}
             </div>
+          </Field>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="age">Age *</Label>
-                <Input
-                  id="age"
-                  type="number"
-                  min={1}
-                  max={120}
-                  placeholder="Enter your age"
-                  className="bg-white text-gray-900"
-                  {...register("age", { valueAsNumber: true })}
-                />
-                {errors.age && (
-                  <p className="text-sm text-red-600">{errors.age.message}</p>
-                )}
+          {values.isUrgent && (
+            <div className="flex flex-col gap-3 rounded-2xl bg-red-600 p-4 text-white sm:flex-row sm:items-center">
+              <Siren className="h-6 w-6 shrink-0" aria-hidden="true" />
+              <div className="flex-1 text-sm">
+                <p className="font-semibold">Life-threatening emergency?</p>
+                <p className="text-white/85">Call us now as well — we&apos;ll alert the team immediately.</p>
               </div>
+              <Button asChild size="sm" className="h-10 rounded-lg bg-white px-4 font-semibold text-red-700 hover:bg-white/90">
+                <a href={`tel:${contactPhoneTel}`}>
+                  <Phone className="h-4 w-4" />
+                  {contactPhone}
+                </a>
+              </Button>
+            </div>
+          )}
+        </FormSection>
 
-              <div className="space-y-2">
-                <Label htmlFor="phone">Phone Number *</Label>
+        {/* 2. Reason */}
+        <FormSection
+          step={2}
+          icon={ClipboardList}
+          title="Why is it needed?"
+          description="Tap a reason, then add anything that helps — patient name, hospital, units, time."
+          done={sections.reason}
+        >
+          <div className="flex flex-wrap gap-2" aria-label="Common reasons">
+            {REASONS.map((chip) => {
+              const active = reason.trim().startsWith(chip);
+              return (
+                <button
+                  key={chip}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => pickReason(chip)}
+                  className={cn(
+                    "rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors",
+                    active
+                      ? "border-primary bg-primary text-white"
+                      : "border-gray-200 bg-white text-gray-700 hover:border-primary/50 hover:text-primary"
+                  )}
+                >
+                  {chip}
+                </button>
+              );
+            })}
+          </div>
+
+          <Field label="Details" htmlFor="reason" error={errors.reason?.message}>
+            <Textarea
+              id="reason"
+              rows={4}
+              maxLength={REASON_MAX}
+              placeholder="e.g. Surgery – patient Ravi K., Lakeshore Hospital, 2 units needed by tomorrow 10 AM"
+              aria-invalid={!!errors.reason}
+              className="min-h-28 rounded-xl border-gray-200 bg-white px-3.5 py-3 text-base text-gray-900 placeholder:text-gray-400 md:text-sm"
+              {...register("reason")}
+            />
+            <p className="text-right text-xs text-gray-400">
+              {reason.length}/{REASON_MAX}
+            </p>
+          </Field>
+        </FormSection>
+
+        {/* 3. Contact */}
+        <FormSection
+          step={3}
+          icon={User}
+          title="Your contact details"
+          description="Who should we call back about this request?"
+          done={sections.details}
+        >
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+            <Field label="First name" htmlFor="firstName" error={errors.firstName?.message}>
+              <Input
+                id="firstName"
+                autoComplete="given-name"
+                placeholder="e.g. Arjun"
+                aria-invalid={!!errors.firstName}
+                className={inputClass}
+                {...register("firstName")}
+              />
+            </Field>
+
+            <Field label="Last name" htmlFor="lastName" error={errors.lastName?.message}>
+              <Input
+                id="lastName"
+                autoComplete="family-name"
+                placeholder="e.g. Lal"
+                aria-invalid={!!errors.lastName}
+                className={inputClass}
+                {...register("lastName")}
+              />
+            </Field>
+
+            <Field label="Your age" htmlFor="age" error={errors.age?.message}>
+              <Input
+                id="age"
+                type="number"
+                inputMode="numeric"
+                min={1}
+                max={120}
+                placeholder="e.g. 32"
+                aria-invalid={!!errors.age}
+                className={inputClass}
+                {...register("age", { valueAsNumber: true })}
+              />
+            </Field>
+
+            <Field
+              label="Mobile number"
+              htmlFor="phone"
+              error={errors.phone?.message}
+              hint={<p className="text-xs text-gray-500">Keep this phone reachable — we&apos;ll call you.</p>}
+            >
+              <div className="relative">
+                <PhonePrefix />
                 <Input
                   id="phone"
-                  placeholder="10-digit mobile number"
+                  type="tel"
+                  inputMode="numeric"
+                  autoComplete="tel-national"
                   maxLength={10}
-                  className="bg-white text-gray-900"
-                  {...register("phone")}
+                  placeholder="10-digit mobile number"
+                  aria-invalid={!!errors.phone}
+                  className={cn(inputClass, "pl-16 tracking-wide")}
+                  {...phoneField}
+                  onChange={digitsOnlyPhone(phoneField.onChange)}
                 />
-                {errors.phone && (
-                  <p className="text-sm text-red-600">{errors.phone.message}</p>
-                )}
               </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Are you an IT Employee? *</Label>
-                <div className="flex flex-col gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setValue("isItEmployee", true)}
-                    className={`w-full py-2 px-3 rounded-lg border-2 text-sm font-medium transition-colors text-left ${
-                      isItEmployeeValue
-                        ? "border-primary bg-primary/10 text-primary"
-                        : "border-gray-200 bg-white text-gray-600 hover:border-gray-300"
-                    }`}
-                  >
-                    IT Employee
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setValue("isItEmployee", false)}
-                    className={`w-full py-2 px-3 rounded-lg border-2 text-sm font-medium transition-colors text-left ${
-                      !isItEmployeeValue
-                        ? "border-primary bg-primary/10 text-primary"
-                        : "border-gray-200 bg-white text-gray-600 hover:border-gray-300"
-                    }`}
-                  >
-                    Non IT Employee
-                  </button>
-                </div>
-                {errors.isItEmployee && (
-                  <p className="text-sm text-red-600">{errors.isItEmployee.message}</p>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="companyName">Company Name *</Label>
-                <Input
-                  id="companyName"
-                  placeholder="Enter company name"
-                  className="bg-white text-gray-900"
-                  {...register("companyName")}
-                />
-                {errors.companyName && (
-                  <p className="text-sm text-red-600">{errors.companyName.message}</p>
-                )}
-              </div>
-            </div>
+            </Field>
           </div>
 
-          {/* Blood Information */}
-          <div className="space-y-4">
-            <h3 className="font-semibold text-gray-900">Blood Information</h3>
-
-            <div className="space-y-2">
-              <Label>Blood Group Required *</Label>
-              <Select<string>
-                onValueChange={(value) => {
-                  if (!value) return;
-                  setValue("bloodGroupId", value);
-                  setBgDisplay(bloodGroups.find((b) => b.id === value)?.displayName ?? "");
-                }}
-              >
-                <SelectTrigger className="bg-white text-gray-900">
-                  <SelectValue placeholder="Select blood group">
-                    {bgDisplay || undefined}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {bloodGroups.map((bg) => (
-                    <SelectItem key={bg.id} value={bg.id}>
-                      {bg.displayName}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {errors.bloodGroupId && (
-                <p className="text-sm text-red-600">{errors.bloodGroupId.message}</p>
-              )}
-            </div>
-          </div>
-
-          {/* Request Details */}
-          <div className="space-y-4">
-            <h3 className="font-semibold text-gray-900">Request Details</h3>
-
-            <div className="space-y-2">
-              <Label htmlFor="reason">Reason for Request *</Label>
-              <Textarea
-                id="reason"
-                placeholder="Please describe why blood is needed (e.g., surgery, accident, medical condition)"
-                rows={3}
-                className="bg-white text-gray-900"
-                {...register("reason")}
+          <div className="space-y-5">
+            <Field label="Are you an IT employee?" error={errors.isItEmployee?.message}>
+              <ItEmployeePicker
+                value={values.isItEmployee}
+                onChange={(v) => setValue("isItEmployee", v, { shouldValidate: true })}
               />
-              {errors.reason && (
-                <p className="text-sm text-red-600">{errors.reason.message}</p>
-              )}
-            </div>
-          </div>
+            </Field>
 
-          {/* Urgent checkbox */}
-          <div className={`p-4 rounded-lg border-2 transition-colors ${isUrgentValue ? "bg-red-50 border-red-300" : "bg-gray-50 border-gray-200"}`}>
-            <div className="flex items-start space-x-3">
-              <Checkbox
-                id="isUrgent"
-                checked={isUrgentValue ?? false}
-                onCheckedChange={(checked) => setValue("isUrgent", checked === true)}
+            <Field label="Company name" htmlFor="companyName" optional error={errors.companyName?.message}>
+              <Input
+                id="companyName"
+                autoComplete="organization"
+                placeholder="e.g. TCS, UST, IBS…"
+                aria-invalid={!!errors.companyName}
+                className={inputClass}
+                {...register("companyName")}
               />
-              <div className="space-y-1">
-                <Label htmlFor="isUrgent" className={`font-semibold cursor-pointer ${isUrgentValue ? "text-red-700" : "text-gray-900"}`}>
-                  This is an Urgent / Emergency request
-                </Label>
-                <p className="text-sm text-gray-500">
-                  Check this if blood is needed immediately. This will flag the request as urgent in our system and alert our team right away.
-                </p>
-              </div>
-            </div>
+            </Field>
           </div>
+        </FormSection>
 
-          {/* Consent */}
-          <div className="p-4 bg-gray-50 rounded-lg">
-            <div className="flex items-start space-x-3">
-              <Checkbox
-                id="willToDonate"
-                checked={willToDonateValue}
-                onCheckedChange={(checked) =>
-                  setValue("willToDonate", checked === true)
-                }
-              />
-              <div className="space-y-1">
-                <Label htmlFor="willToDonate" className="font-medium cursor-pointer">
-                  I confirm that the above information is accurate and I consent to being contacted regarding this blood request *
-                </Label>
-                <p className="text-sm text-gray-500">
-                  By checking this box, you agree that Blood Connect may contact
-                  you to follow up on this request and coordinate assistance.
-                </p>
-              </div>
-            </div>
-            {errors.willToDonate && (
-              <p className="text-sm text-red-600 mt-2">{errors.willToDonate.message}</p>
+        {/* Consent */}
+        <div className="space-y-2">
+          <div
+            className={cn(
+              "flex items-start gap-3 rounded-2xl border-2 p-4 transition-colors",
+              values.willToDonate
+                ? "border-primary/40 bg-rose-50/60"
+                : errors.willToDonate
+                  ? "border-red-300 bg-red-50/40"
+                  : "border-gray-200 bg-gray-50"
             )}
+          >
+            <Checkbox
+              id="willToDonate"
+              className="mt-0.5 size-5"
+              checked={values.willToDonate}
+              aria-invalid={!!errors.willToDonate}
+              onCheckedChange={(checked) =>
+                setValue("willToDonate", checked === true, { shouldValidate: true })
+              }
+            />
+            <div className="space-y-1">
+              <Label htmlFor="willToDonate" className="cursor-pointer font-semibold text-gray-900">
+                The details are correct and you may contact me
+              </Label>
+              <p className="text-sm text-gray-600">
+                Blood Connect may call you to follow up on this request and coordinate donors.
+              </p>
+            </div>
           </div>
+          <FieldError message={errors.willToDonate?.message} />
+        </div>
 
-          <Button type="submit" className="w-full" disabled={isSubmitting}>
+        <div className="space-y-3">
+          <Button
+            type="submit"
+            size="lg"
+            disabled={isSubmitting}
+            className={cn(
+              "h-13 w-full rounded-xl text-base font-semibold shadow-lg shadow-primary/25",
+              values.isUrgent && "bg-red-700 hover:bg-red-800"
+            )}
+          >
             {isSubmitting ? (
               <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Submitting Request...
+                <Loader2 className="h-5 w-5 animate-spin" />
+                Sending request…
               </>
             ) : (
-              "Submit Blood Request"
+              <>
+                {values.isUrgent ? <Siren className="h-5 w-5" /> : <Send className="h-5 w-5" />}
+                {values.isUrgent ? "Send Urgent Request" : "Send Blood Request"}
+                <ArrowRight className="h-4 w-4" />
+              </>
             )}
           </Button>
-        </form>
-      </CardContent>
-    </Card>
+          <p className="flex items-center justify-center gap-1.5 text-center text-xs text-gray-500">
+            <Lock className="h-3.5 w-3.5" aria-hidden="true" />
+            Only our coordination team can see your details.
+          </p>
+        </div>
+      </form>
+    </div>
   );
 }

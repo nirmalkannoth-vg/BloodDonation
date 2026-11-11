@@ -1,64 +1,130 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
+import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { addDays, format, isAfter, parseISO, startOfDay } from "date-fns";
 import { donorRegistrationSchema, type DonorRegistrationInput } from "@/lib/validations/donor";
 import { registerDonor } from "@/actions/donor";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import { cn } from "@/lib/utils";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Loader2, CheckCircle2 } from "lucide-react";
+  BloodGroupPicker,
+  Field,
+  FieldError,
+  FormProgressHeader,
+  FormSection,
+  ItEmployeePicker,
+  PhonePrefix,
+  digitsOnlyPhone,
+  inputClass,
+  isValidPhone,
+  type BloodGroupOption,
+} from "./form-parts";
+import {
+  ArrowRight,
+  Briefcase,
+  CalendarCheck,
+  CheckCircle2,
+  Droplet,
+  HeartHandshake,
+  Loader2,
+  Lock,
+  PhoneCall,
+  ShieldCheck,
+  Sparkles,
+  User,
+} from "lucide-react";
 import { toast } from "sonner";
 
-interface BloodGroup {
-  id: string;
-  name: string;
-  displayName: string;
-}
-
 interface DonorRegistrationFormProps {
-  bloodGroups: BloodGroup[];
+  bloodGroups: BloodGroupOption[];
+  /** Days a donor must wait between donations (Admin → Settings). */
+  eligibilityIntervalDays?: number;
 }
 
-export function DonorRegistrationForm({ bloodGroups }: DonorRegistrationFormProps) {
+export function DonorRegistrationForm({
+  bloodGroups,
+  eligibilityIntervalDays = 90,
+}: DonorRegistrationFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isSuccess, setIsSuccess] = useState(false);
-  const [bgDisplay, setBgDisplay] = useState("");
+  const [submittedName, setSubmittedName] = useState<string | null>(null);
+  const [neverDonated, setNeverDonated] = useState(false);
+  const topRef = useRef<HTMLDivElement>(null);
 
   const {
     register,
     handleSubmit,
     setValue,
     watch,
+    reset,
     formState: { errors },
   } = useForm<DonorRegistrationInput>({
     resolver: zodResolver(donorRegistrationSchema),
     defaultValues: {
+      firstName: "",
+      lastName: "",
+      phone: "",
+      lastDonationDate: "",
+      companyName: "",
       consentToContact: false,
       isItEmployee: true,
     },
   });
 
-  const consentValue = watch("consentToContact");
-  const isItEmployeeValue = watch("isItEmployee");
+  const values = watch();
+  const phoneField = register("phone");
+
+  // Progress across the parts the user must fill in (IT employee is pre-selected)
+  const sections = {
+    personal:
+      !!values.firstName?.trim() &&
+      !!values.lastName?.trim() &&
+      Number.isFinite(values.age) &&
+      isValidPhone(values.phone),
+    blood: !!values.bloodGroupId && !!values.lastDonationDate,
+    consent: values.consentToContact === true,
+  };
+  const completed = Object.values(sections).filter(Boolean).length;
+
+  // Live "when can I donate next?" hint
+  let eligibility: { date: string; now: boolean } | null = null;
+  if (values.lastDonationDate) {
+    const last = parseISO(values.lastDonationDate);
+    if (!Number.isNaN(last.getTime())) {
+      const next = addDays(last, eligibilityIntervalDays);
+      eligibility = {
+        date: format(next, "d MMM yyyy"),
+        now: !isAfter(startOfDay(next), startOfDay(new Date())),
+      };
+    }
+  }
+
+  const toggleNeverDonated = () => {
+    const next = !neverDonated;
+    setNeverDonated(next);
+    setValue("lastDonationDate", next ? format(new Date(), "yyyy-MM-dd") : "", {
+      shouldValidate: next,
+    });
+  };
+
+  const scrollToTop = () =>
+    requestAnimationFrame(() =>
+      topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+    );
 
   const onSubmit = async (data: DonorRegistrationInput) => {
     setIsSubmitting(true);
     try {
       const result = await registerDonor(data);
       if (result.success) {
-        setIsSuccess(true);
+        setSubmittedName(data.firstName.trim());
         toast.success("Registration successful! We will contact you soon.");
+        scrollToTop();
       } else {
         toast.error(result.error || "Registration failed");
       }
@@ -69,245 +135,321 @@ export function DonorRegistrationForm({ bloodGroups }: DonorRegistrationFormProp
     }
   };
 
-  if (isSuccess) {
+  /* ------------------------------ Success view ------------------------------ */
+
+  if (submittedName !== null) {
     return (
-      <Card className="max-w-2xl mx-auto">
-        <CardContent className="pt-12 pb-12 text-center">
-          <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
-            <CheckCircle2 className="w-8 h-8 text-green-600" />
+      <div
+        ref={topRef}
+        className="overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-xl shadow-gray-200/60"
+      >
+        <div className="bg-gradient-to-br from-emerald-50 to-white px-6 pb-8 pt-12 text-center sm:px-10">
+          <div className="relative mx-auto mb-6 h-20 w-20">
+            <span className="absolute inset-0 animate-ping rounded-full bg-emerald-200 opacity-60" />
+            <span className="relative flex h-20 w-20 items-center justify-center rounded-full bg-emerald-500 text-white shadow-lg shadow-emerald-500/30">
+              <CheckCircle2 className="h-10 w-10" />
+            </span>
           </div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">
-            Thank You for Registering!
+          <h2 className="font-display text-4xl font-bold uppercase tracking-wide text-gray-900">
+            Thank you, {submittedName}!
           </h2>
-          <p className="text-gray-600 max-w-md mx-auto">
-            Your registration has been received. Our team will verify your
-            information and contact you soon.
+          <p className="mx-auto mt-3 max-w-md text-gray-600">
+            You&apos;re now part of our life-saving community. Your registration has been received.
           </p>
-        </CardContent>
-      </Card>
+        </div>
+
+        <div className="px-6 pb-10 sm:px-10">
+          <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-gray-400">
+            What happens next
+          </h3>
+          <ol className="space-y-4">
+            {[
+              { icon: ShieldCheck, text: "Our team verifies your details." },
+              { icon: PhoneCall, text: "We call you when a patient needs your blood group." },
+              { icon: HeartHandshake, text: "You donate at the hospital or blood bank and save a life." },
+            ].map(({ icon: Icon, text }, i) => (
+              <li key={text} className="flex items-center gap-4">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                  <Icon className="h-5 w-5" />
+                </span>
+                <span className="text-gray-700">
+                  <span className="font-semibold text-gray-900">{i + 1}.</span> {text}
+                </span>
+              </li>
+            ))}
+          </ol>
+
+          <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+            <Button asChild size="lg" className="h-12 flex-1 rounded-xl text-base font-semibold">
+              <Link href="/">
+                Back to Home
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+            </Button>
+            <Button
+              type="button"
+              size="lg"
+              variant="outline"
+              className="h-12 flex-1 rounded-xl text-base font-semibold"
+              onClick={() => {
+                reset();
+                setNeverDonated(false);
+                setSubmittedName(null);
+                scrollToTop();
+              }}
+            >
+              Register another donor
+            </Button>
+          </div>
+        </div>
+      </div>
     );
   }
 
+  /* -------------------------------- Form view ------------------------------- */
+
   return (
-    <Card className="max-w-2xl mx-auto">
-      <CardHeader>
-        <CardTitle>Donor Registration</CardTitle>
-        <CardDescription>
-          All fields are required. Fill out the form below to register as a blood donor.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+    <div
+      ref={topRef}
+      className="overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-xl shadow-gray-200/60"
+    >
+      <FormProgressHeader
+        title="Donor Registration"
+        subtitle="Takes about 2 minutes. Only Company Name is optional."
+        completed={completed}
+        total={3}
+      />
 
-          {/* Personal Information */}
-          <div className="space-y-4">
-            <h3 className="font-semibold text-gray-900">Personal Information</h3>
+      <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-10 px-6 py-8 sm:px-8">
+        {/* 1. Personal */}
+        <FormSection
+          step={1}
+          icon={User}
+          title="About you"
+          description="So we know who to contact."
+          done={sections.personal}
+        >
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+            <Field label="First name" htmlFor="firstName" error={errors.firstName?.message}>
+              <Input
+                id="firstName"
+                autoComplete="given-name"
+                placeholder="e.g. Arjun"
+                aria-invalid={!!errors.firstName}
+                className={inputClass}
+                {...register("firstName")}
+              />
+            </Field>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="firstName">First Name *</Label>
-                <Input
-                  id="firstName"
-                  placeholder="Enter first name"
-                  className="bg-white text-gray-900"
-                  {...register("firstName")}
-                />
-                {errors.firstName && (
-                  <p className="text-sm text-red-600">{errors.firstName.message}</p>
-                )}
-              </div>
+            <Field label="Last name" htmlFor="lastName" error={errors.lastName?.message}>
+              <Input
+                id="lastName"
+                autoComplete="family-name"
+                placeholder="e.g. Lal"
+                aria-invalid={!!errors.lastName}
+                className={inputClass}
+                {...register("lastName")}
+              />
+            </Field>
 
-              <div className="space-y-2">
-                <Label htmlFor="lastName">Last Name *</Label>
-                <Input
-                  id="lastName"
-                  placeholder="Enter last name"
-                  className="bg-white text-gray-900"
-                  {...register("lastName")}
-                />
-                {errors.lastName && (
-                  <p className="text-sm text-red-600">{errors.lastName.message}</p>
-                )}
-              </div>
-            </div>
+            <Field
+              label="Age"
+              htmlFor="age"
+              error={errors.age?.message}
+              hint={<p className="text-xs text-gray-500">Donors must be 18–65 years old.</p>}
+            >
+              <Input
+                id="age"
+                type="number"
+                inputMode="numeric"
+                min={18}
+                max={65}
+                placeholder="e.g. 28"
+                aria-invalid={!!errors.age}
+                className={inputClass}
+                {...register("age", { valueAsNumber: true })}
+              />
+            </Field>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="age">Age *</Label>
-                <Input
-                  id="age"
-                  type="number"
-                  min={18}
-                  max={65}
-                  placeholder="Enter your age"
-                  className="bg-white text-gray-900"
-                  {...register("age", { valueAsNumber: true })}
-                />
-                {errors.age && (
-                  <p className="text-sm text-red-600">{errors.age.message}</p>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="phone">Phone Number *</Label>
+            <Field
+              label="Mobile number"
+              htmlFor="phone"
+              error={errors.phone?.message}
+              hint={<p className="text-xs text-gray-500">We&apos;ll only call when your blood is needed.</p>}
+            >
+              <div className="relative">
+                <PhonePrefix />
                 <Input
                   id="phone"
-                  placeholder="Enter your Phone Number"
+                  type="tel"
+                  inputMode="numeric"
+                  autoComplete="tel-national"
                   maxLength={10}
-                  className="bg-white text-gray-900"
-                  {...register("phone")}
+                  placeholder="10-digit mobile number"
+                  aria-invalid={!!errors.phone}
+                  className={cn(inputClass, "pl-16 tracking-wide")}
+                  {...phoneField}
+                  onChange={digitsOnlyPhone(phoneField.onChange)}
                 />
-                {errors.phone && (
-                  <p className="text-sm text-red-600">{errors.phone.message}</p>
-                )}
               </div>
-            </div>
+            </Field>
           </div>
+        </FormSection>
 
-          {/* Blood Information */}
-          <div className="space-y-4">
-            <h3 className="font-semibold text-gray-900">Blood Information</h3>
+        {/* 2. Blood */}
+        <FormSection
+          step={2}
+          icon={Droplet}
+          title="Blood details"
+          description="Helps us match you with patients who need your blood group."
+          done={sections.blood}
+        >
+          <Field label="Blood group" error={errors.bloodGroupId?.message}>
+            <BloodGroupPicker
+              bloodGroups={bloodGroups}
+              value={values.bloodGroupId}
+              onChange={(id) => setValue("bloodGroupId", id, { shouldValidate: true })}
+            />
+          </Field>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Blood Group *</Label>
-                <Select<string>
-                  onValueChange={(value) => {
-                    if (!value) return;
-                    setValue("bloodGroupId", value);
-                    setBgDisplay(bloodGroups.find((b) => b.id === value)?.displayName ?? "");
-                  }}
-                >
-                  <SelectTrigger className="bg-white text-gray-900">
-                    <SelectValue placeholder="Select blood group">
-                      {bgDisplay || undefined}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {bloodGroups.map((bg) => (
-                      <SelectItem key={bg.id} value={bg.id}>
-                        {bg.displayName}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {errors.bloodGroupId && (
-                  <p className="text-sm text-red-600">{errors.bloodGroupId.message}</p>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="lastDonationDate">
-                  Last Donation Date *{" "}
-                  <span className="text-xs font-normal text-gray-400">(DD/MM/YYYY)</span>
-                </Label>
-                <Input
-                  id="lastDonationDate"
-                  type="date"
-                  className="bg-white text-gray-900"
-                  {...register("lastDonationDate")}
-                />
-                {errors.lastDonationDate && (
-                  <p className="text-sm text-red-600">{errors.lastDonationDate.message}</p>
-                )}
-                <p className="text-xs text-blue-600 bg-blue-50 rounded px-2 py-1">
-                  You will be eligible to donate again after 90 days from your last donation date.
-                </p>
-                <p className="text-xs text-gray-500">
-                  If you have never donated, enter today&apos;s date
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Work Information */}
-          <div className="space-y-4">
-            <h3 className="font-semibold text-gray-900">Work Information</h3>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Are you an IT Employee? *</Label>
-                <div className="flex flex-col gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setValue("isItEmployee", true)}
-                    className={`w-full py-2 px-3 rounded-lg border-2 text-sm font-medium transition-colors text-left ${
-                      isItEmployeeValue
-                        ? "border-primary bg-primary/10 text-primary"
-                        : "border-gray-200 bg-white text-gray-600 hover:border-gray-300"
-                    }`}
-                  >
-                    IT Employee
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setValue("isItEmployee", false)}
-                    className={`w-full py-2 px-3 rounded-lg border-2 text-sm font-medium transition-colors text-left ${
-                      !isItEmployeeValue
-                        ? "border-primary bg-primary/10 text-primary"
-                        : "border-gray-200 bg-white text-gray-600 hover:border-gray-300"
-                    }`}
-                  >
-                    Non IT Employee
-                  </button>
-                </div>
-                {errors.isItEmployee && (
-                  <p className="text-sm text-red-600">{errors.isItEmployee.message}</p>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="companyName">Company Name *</Label>
-                <Input
-                  id="companyName"
-                  placeholder="Enter company name"
-                  className="bg-white text-gray-900"
-                  {...register("companyName")}
-                />
-                {errors.companyName && (
-                  <p className="text-sm text-red-600">{errors.companyName.message}</p>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Consent */}
-          <div className="p-4 bg-gray-50 rounded-lg">
-            <div className="flex items-start space-x-3">
-              <Checkbox
-                id="consentToContact"
-                checked={consentValue}
-                onCheckedChange={(checked) =>
-                  setValue("consentToContact", checked === true)
-                }
+          <Field label="Last donation date" htmlFor="lastDonationDate" error={errors.lastDonationDate?.message}>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+              <Input
+                id="lastDonationDate"
+                type="date"
+                readOnly={neverDonated}
+                aria-invalid={!!errors.lastDonationDate}
+                className={cn(inputClass, "sm:max-w-[240px]", neverDonated && "bg-gray-50 text-gray-500")}
+                {...register("lastDonationDate")}
               />
-              <div className="space-y-1">
-                <Label htmlFor="consentToContact" className="font-medium cursor-pointer">
-                  I am willing to donate blood *
-                </Label>
-                <p className="text-sm text-gray-500">
-                  By checking this box, you confirm your willingness to be contacted
-                  when there is a blood donation requirement matching your profile.
-                </p>
-              </div>
+              <button
+                type="button"
+                aria-pressed={neverDonated}
+                onClick={toggleNeverDonated}
+                className={cn(
+                  "inline-flex h-11 items-center justify-center gap-2 rounded-xl border-2 px-4 text-sm font-medium transition-colors",
+                  neverDonated
+                    ? "border-primary bg-primary/10 text-primary"
+                    : "border-dashed border-gray-300 text-gray-600 hover:border-primary/50 hover:text-primary"
+                )}
+              >
+                <Sparkles className="h-4 w-4" aria-hidden="true" />
+                {neverDonated ? "First-time donor ✓" : "I've never donated"}
+              </button>
             </div>
-            {errors.consentToContact && (
-              <p className="text-sm text-red-600 mt-2">{errors.consentToContact.message}</p>
-            )}
-          </div>
+          </Field>
 
-          <Button type="submit" className="w-full" disabled={isSubmitting}>
+          {eligibility && !errors.lastDonationDate && (
+            <div
+              className={cn(
+                "flex items-start gap-3 rounded-xl px-4 py-3 text-sm",
+                eligibility.now ? "bg-emerald-50 text-emerald-800" : "bg-sky-50 text-sky-800"
+              )}
+            >
+              <CalendarCheck className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+              <p>
+                {eligibility.now ? (
+                  <>
+                    <span className="font-semibold">Great, you can donate right away!</span> It&apos;s been
+                    more than {eligibilityIntervalDays} days since your last donation.
+                  </>
+                ) : (
+                  <>
+                    You&apos;ll be eligible to donate from{" "}
+                    <span className="font-semibold">{eligibility.date}</span> ({eligibilityIntervalDays} days
+                    after your last donation).
+                  </>
+                )}
+              </p>
+            </div>
+          )}
+        </FormSection>
+
+        {/* 3. Work */}
+        <FormSection
+          step={3}
+          icon={Briefcase}
+          title="Work details"
+          description="We mostly coordinate donations within the InfoPark community."
+        >
+          <Field label="Are you an IT employee?" error={errors.isItEmployee?.message}>
+            <ItEmployeePicker
+              value={values.isItEmployee}
+              onChange={(v) => setValue("isItEmployee", v, { shouldValidate: true })}
+            />
+          </Field>
+
+          <Field label="Company name" htmlFor="companyName" optional error={errors.companyName?.message}>
+            <Input
+              id="companyName"
+              autoComplete="organization"
+              placeholder="e.g. TCS, UST, IBS…"
+              aria-invalid={!!errors.companyName}
+              className={inputClass}
+              {...register("companyName")}
+            />
+          </Field>
+        </FormSection>
+
+        {/* Consent */}
+        <div className="space-y-2">
+          <div
+            className={cn(
+              "flex items-start gap-3 rounded-2xl border-2 p-4 transition-colors",
+              values.consentToContact
+                ? "border-primary/40 bg-rose-50/60"
+                : errors.consentToContact
+                  ? "border-red-300 bg-red-50/40"
+                  : "border-gray-200 bg-gray-50"
+            )}
+          >
+            <Checkbox
+              id="consentToContact"
+              className="mt-0.5 size-5"
+              checked={values.consentToContact}
+              aria-invalid={!!errors.consentToContact}
+              onCheckedChange={(checked) =>
+                setValue("consentToContact", checked === true, { shouldValidate: true })
+              }
+            />
+            <div className="space-y-1">
+              <Label htmlFor="consentToContact" className="cursor-pointer font-semibold text-gray-900">
+                Yes, I&apos;m willing to donate blood
+              </Label>
+              <p className="text-sm text-gray-600">
+                You agree to be contacted when there&apos;s a blood requirement matching your profile.
+              </p>
+            </div>
+          </div>
+          <FieldError message={errors.consentToContact?.message} />
+        </div>
+
+        <div className="space-y-3">
+          <Button
+            type="submit"
+            size="lg"
+            disabled={isSubmitting}
+            className="h-13 w-full rounded-xl text-base font-semibold shadow-lg shadow-primary/25"
+          >
             {isSubmitting ? (
               <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Registering...
+                <Loader2 className="h-5 w-5 animate-spin" />
+                Registering…
               </>
             ) : (
-              "Register as Donor"
+              <>
+                <Droplet className="h-5 w-5" fill="currentColor" />
+                Register as Donor
+                <ArrowRight className="h-4 w-4" />
+              </>
             )}
           </Button>
-        </form>
-      </CardContent>
-    </Card>
+          <p className="flex items-center justify-center gap-1.5 text-center text-xs text-gray-500">
+            <Lock className="h-3.5 w-3.5" aria-hidden="true" />
+            Your details are private and never shown on the public website.
+          </p>
+        </div>
+      </form>
+    </div>
   );
 }

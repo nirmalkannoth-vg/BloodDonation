@@ -25,7 +25,12 @@ export const donorRegistrationSchema = z.object({
     .min(18, "Donor must be at least 18 years old")
     .max(65, "Donor must be 65 years old or younger"),
   bloodGroupId: z.string().uuid("Please select a blood group"),
-  lastDonationDate: z.string().min(1, "Last donation date is required"),
+  lastDonationDate: z
+    .string()
+    .min(1, "Last donation date is required")
+    .refine((val) => !Number.isNaN(Date.parse(val)), "Please enter a valid date")
+    // One day of slack so a user ahead of the server's timezone can still pick "today"
+    .refine((val) => Date.parse(val) <= Date.now() + 24 * 60 * 60 * 1000, "Date can't be in the future"),
   consentToContact: z
     .boolean()
     .refine((val) => val === true, {
@@ -35,8 +40,9 @@ export const donorRegistrationSchema = z.object({
   isItEmployee: z.boolean({ required_error: "Please indicate if you are an IT employee" }),
   companyName: z
     .string()
-    .min(1, "Company name is required")
-    .max(255, "Company name must be less than 255 characters"),
+    .trim()
+    .max(255, "Company name must be less than 255 characters")
+    .optional(),
 });
 
 export type DonorRegistrationInput = z.infer<typeof donorRegistrationSchema>;

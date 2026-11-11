@@ -3,167 +3,197 @@
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
+import { CONTACT_SUBJECTS, contactSchema, type ContactInput } from "@/lib/validations/contact";
+import { submitContactMessage } from "@/actions/contact";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Loader2, CheckCircle2 } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Field, PhonePrefix, digitsOnlyPhone, inputClass } from "./form-parts";
+import { CheckCircle2, Loader2, Lock, Send } from "lucide-react";
 import { toast } from "sonner";
 
-const contactSchema = z.object({
-  name: z.string().min(1, "Name is required").max(255),
-  email: z.string().email("Please enter a valid email"),
-  phone: z.string().optional(),
-  subject: z.string().min(1, "Please select a subject"),
-  message: z.string().min(10, "Message must be at least 10 characters").max(2000),
-});
-
-type ContactInput = z.infer<typeof contactSchema>;
-
-const subjects = [
-  "General Inquiry",
-  "Blood Donation",
-  "Blood Request",
-  "Partnership",
-  "Volunteer",
-  "Feedback",
-  "Other",
-];
+const MESSAGE_MAX = 2000;
 
 export function ContactForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isSuccess, setIsSuccess] = useState(false);
+  const [sentTo, setSentTo] = useState<string | null>(null);
 
   const {
     register,
     handleSubmit,
     setValue,
+    watch,
+    reset,
     formState: { errors },
   } = useForm<ContactInput>({
     resolver: zodResolver(contactSchema),
+    defaultValues: { name: "", email: "", phone: "", message: "", website: "" },
   });
+
+  const subject = watch("subject");
+  const message = watch("message") ?? "";
+  const phoneField = register("phone");
 
   const onSubmit = async (data: ContactInput) => {
     setIsSubmitting(true);
-    
-    // Simulate form submission
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-    
-    console.log("Contact form submitted:", data);
-    setIsSuccess(true);
-    toast.success("Message sent successfully!");
-    setIsSubmitting(false);
+    try {
+      const result = await submitContactMessage(data);
+      if (result.success) {
+        setSentTo(data.name.trim().split(/\s+/)[0]);
+        toast.success("Message sent successfully!");
+      } else {
+        toast.error(result.error || "Couldn't send your message");
+      }
+    } catch {
+      toast.error("An unexpected error occurred");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  if (isSuccess) {
+  if (sentTo !== null) {
     return (
-      <div className="text-center py-8">
-        <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
-          <CheckCircle2 className="w-6 h-6 text-green-600" />
+      <div className="py-10 text-center">
+        <div className="relative mx-auto mb-5 h-16 w-16">
+          <span className="absolute inset-0 animate-ping rounded-full bg-emerald-200 opacity-60" />
+          <span className="relative flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500 text-white shadow-lg shadow-emerald-500/30">
+            <CheckCircle2 className="h-8 w-8" />
+          </span>
         </div>
-        <h3 className="text-lg font-semibold text-gray-900 mb-2">
-          Message Sent!
-        </h3>
-        <p className="text-gray-600 mb-4">
-          Thank you for reaching out. We&apos;ll get back to you soon.
+        <h3 className="text-2xl font-bold text-gray-900">Thanks, {sentTo}!</h3>
+        <p className="mx-auto mt-2 max-w-sm text-gray-600">
+          Your message has reached our team. We&apos;ll get back to you as soon as we can.
         </p>
-        <Button variant="outline" onClick={() => setIsSuccess(false)}>
-          Send Another Message
+        <Button
+          variant="outline"
+          className="mt-6 h-11 rounded-xl px-5 font-semibold"
+          onClick={() => {
+            reset();
+            setSentTo(null);
+          }}
+        >
+          Send another message
         </Button>
       </div>
     );
   }
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="name">Your Name *</Label>
+    <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-6">
+      {/* Honeypot (hidden from people, tempting for bots) */}
+      <div aria-hidden="true" className="absolute -left-[9999px] h-0 w-0 overflow-hidden">
+        <label htmlFor="website">Website</label>
+        <input id="website" tabIndex={-1} autoComplete="off" {...register("website")} />
+      </div>
+
+      <Field label="What is this about?" error={errors.subject?.message}>
+        <div role="radiogroup" aria-label="What is this about?" className="flex flex-wrap gap-2">
+          {CONTACT_SUBJECTS.map((s) => {
+            const selected = subject === s;
+            return (
+              <button
+                key={s}
+                type="button"
+                role="radio"
+                aria-checked={selected}
+                onClick={() => setValue("subject", s, { shouldValidate: true })}
+                className={cn(
+                  "rounded-full border px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-primary/40",
+                  selected
+                    ? "border-primary bg-primary text-white shadow-md shadow-primary/20"
+                    : "border-gray-200 bg-white text-gray-700 hover:border-primary/50 hover:text-primary"
+                )}
+              >
+                {s}
+              </button>
+            );
+          })}
+        </div>
+      </Field>
+
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+        <Field label="Your name" htmlFor="name" error={errors.name?.message}>
           <Input
             id="name"
-            placeholder="Enter your name"
+            autoComplete="name"
+            placeholder="e.g. Arjun Lal"
+            aria-invalid={!!errors.name}
+            className={inputClass}
             {...register("name")}
           />
-          {errors.name && (
-            <p className="text-sm text-red-600">{errors.name.message}</p>
-          )}
-        </div>
+        </Field>
 
-        <div className="space-y-2">
-          <Label htmlFor="email">Email Address *</Label>
+        <Field label="Email" htmlFor="email" error={errors.email?.message}>
           <Input
             id="email"
             type="email"
-            placeholder="your@email.com"
+            autoComplete="email"
+            placeholder="you@example.com"
+            aria-invalid={!!errors.email}
+            className={inputClass}
             {...register("email")}
           />
-          {errors.email && (
-            <p className="text-sm text-red-600">{errors.email.message}</p>
-          )}
-        </div>
+        </Field>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="phone">Phone Number</Label>
+      <Field label="Mobile number" htmlFor="phone" optional error={errors.phone?.message}>
+        <div className="relative sm:max-w-[calc(50%-0.625rem)]">
+          <PhonePrefix />
           <Input
             id="phone"
-            placeholder="+91 9876543210"
-            {...register("phone")}
+            type="tel"
+            inputMode="numeric"
+            autoComplete="tel-national"
+            maxLength={10}
+            placeholder="10-digit mobile number"
+            aria-invalid={!!errors.phone}
+            className={cn(inputClass, "pl-16 tracking-wide")}
+            {...phoneField}
+            onChange={digitsOnlyPhone(phoneField.onChange)}
           />
         </div>
+      </Field>
 
-        <div className="space-y-2">
-          <Label htmlFor="subject">Subject *</Label>
-          <Select<string> onValueChange={(value) => value && setValue("subject", value)}>
-            <SelectTrigger>
-              <SelectValue placeholder="Select a subject" />
-            </SelectTrigger>
-            <SelectContent>
-              {subjects.map((subject) => (
-                <SelectItem key={subject} value={subject}>
-                  {subject}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {errors.subject && (
-            <p className="text-sm text-red-600">{errors.subject.message}</p>
-          )}
-        </div>
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="message">Message *</Label>
+      <Field label="Message" htmlFor="message" error={errors.message?.message}>
         <Textarea
           id="message"
-          placeholder="How can we help you?"
           rows={5}
+          maxLength={MESSAGE_MAX}
+          placeholder="How can we help you?"
+          aria-invalid={!!errors.message}
+          className="min-h-32 rounded-xl border-gray-200 bg-white px-3.5 py-3 text-base text-gray-900 placeholder:text-gray-400 md:text-sm"
           {...register("message")}
         />
-        {errors.message && (
-          <p className="text-sm text-red-600">{errors.message.message}</p>
-        )}
-      </div>
+        <p className="text-right text-xs text-gray-400">
+          {message.length}/{MESSAGE_MAX}
+        </p>
+      </Field>
 
-      <Button type="submit" className="w-full" disabled={isSubmitting}>
-        {isSubmitting ? (
-          <>
-            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-            Sending...
-          </>
-        ) : (
-          "Send Message"
-        )}
-      </Button>
+      <div className="space-y-3">
+        <Button
+          type="submit"
+          size="lg"
+          disabled={isSubmitting}
+          className="h-12 w-full rounded-xl text-base font-semibold shadow-lg shadow-primary/25"
+        >
+          {isSubmitting ? (
+            <>
+              <Loader2 className="h-5 w-5 animate-spin" />
+              Sending…
+            </>
+          ) : (
+            <>
+              <Send className="h-5 w-5" />
+              Send Message
+            </>
+          )}
+        </Button>
+        <p className="flex items-center justify-center gap-1.5 text-center text-xs text-gray-500">
+          <Lock className="h-3.5 w-3.5" aria-hidden="true" />
+          Your details are only used to reply to you.
+        </p>
+      </div>
     </form>
   );
 }

@@ -57,7 +57,7 @@ export async function updateBloodRequest(
     phone: string;
     bloodGroupId: string;
     isItEmployee: boolean;
-    companyName: string;
+    companyName?: string;
     reason: string;
     isUrgent: boolean;
     willToDonate: boolean;
@@ -76,7 +76,7 @@ export async function updateBloodRequest(
         bloodGroupId: data.bloodGroupId,
         requesterAge: data.age,
         requesterIsItEmployee: data.isItEmployee,
-        requesterCompany: data.companyName,
+        requesterCompany: data.companyName?.trim() || null,
         reason: data.reason,
         urgency: data.isUrgent ? "URGENT" : "NORMAL",
         requesterWillDonate: data.willToDonate,
