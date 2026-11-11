@@ -263,6 +263,21 @@ The home page hero shows `public/images/hero-donor.png` if it exists (landscape,
 on a flat `#F0F0F1` background — the hero section uses the same colour so the photo blends in).
 Until it is added, an SVG blood-drop illustration is shown instead. No restart is needed.
 
+The Health Awareness and About pages use free stock photos in `public/images/awareness/`
+(Unsplash License / Pexels License — free for commercial use, no attribution required).
+By design **no photo shows a human face** — keep it that way when replacing them.
+
+| File | Source |
+|------|--------|
+| `blood-bag.jpg` | [Unsplash – Aman Chaturvedi](https://unsplash.com/photos/0ZZo5o00o80) |
+| `blood-tubes-lab.jpg` | [Unsplash – Testalize.me](https://unsplash.com/photos/0jE8ynV4mis) |
+| `donor-arm-blood-bags.jpg` | [Pexels – Tahir Xəlfəquliyev](https://www.pexels.com/photo/blood-donation-process-in-a-clinic-setting-37553387/) |
+| `blood-vials-rack.jpg` | [Pexels – Tahir Xəlfəquliyev](https://www.pexels.com/photo/blood-sample-vials-in-laboratory-rack-37548861/) |
+| `gloved-hands-sample.jpg` | [Pexels – Los Muertos Crew](https://www.pexels.com/photo/a-person-holding-vacutainer-8460340/) |
+| `blood-bags-types.jpg` | [Pexels – Charlie-Helen Robinson](https://www.pexels.com/photo/bags-of-blood-4531307/) |
+
+Replace any of them with your own photos by keeping the same file name.
+
 Footer social icons (Facebook, YouTube, LinkedIn, Instagram, X) only appear for links set in
 **Admin → Settings → Social Media**.
 

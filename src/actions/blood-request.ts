@@ -70,7 +70,7 @@ export async function submitBloodRequest(data: BloodRequestInput): Promise<Blood
         requesterLastDonationDate: null,
         requesterWillDonate: data.willToDonate,
         requesterIsItEmployee: data.isItEmployee,
-        requesterCompany: data.companyName,
+        requesterCompany: data.companyName?.trim() || null,
       })
       .returning({ id: bloodRequests.id });
 

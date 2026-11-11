@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Droplet } from "lucide-react";
 import { getAllSettings } from "@/services/public";
 import { DEFAULT_SETTINGS } from "@/config/constants";
 import { BrandLogo } from "./brand-logo";
@@ -93,7 +94,14 @@ export async function PublicFooter() {
             </div>
           )}
 
-          <p className="text-base italic text-gray-800">Donate Blood... Save Lives...</p>
+          <p className="flex items-center gap-2.5 font-display text-2xl font-bold uppercase tracking-wide text-gray-900">
+            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-white shadow-md shadow-primary/30">
+              <Droplet className="h-4 w-4" fill="currentColor" aria-hidden="true" />
+            </span>
+            Donate Blood
+            <span className="h-1.5 w-1.5 rounded-full bg-primary" aria-hidden="true" />
+            <span className="text-primary">Save Lives</span>
+          </p>
         </div>
 
         <div className="flex flex-col items-center gap-2 border-t border-gray-200 py-5 text-center text-xs text-gray-500 md:flex-row md:justify-between md:text-left">

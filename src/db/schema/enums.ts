@@ -59,6 +59,7 @@ export const notificationTypeEnum = pgEnum("notification_type", [
   "DONOR_UPDATED",
   "REQUEST_STATUS_CHANGED",
   "CONTENT_PUBLISHED",
+  "CONTACT_MESSAGE",
 ]);
 
 export const auditActionEnum = pgEnum("audit_action", [

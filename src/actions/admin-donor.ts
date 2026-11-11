@@ -87,7 +87,7 @@ export async function updateDonor(
     bloodGroupId: string;
     lastDonationDate: string;
     isItEmployee: boolean;
-    companyName: string;
+    companyName?: string;
     consentToContact: boolean;
   }
 ) {
@@ -120,7 +120,7 @@ export async function updateDonor(
         isItEmployee: data.isItEmployee,
         lastDonationDate: data.lastDonationDate,
         nextEligibleDate,
-        occupation: data.companyName,
+        occupation: data.companyName?.trim() || null,
         consentToContact: data.consentToContact,
         updatedBy: session.admin.id,
         updatedAt: new Date(),

@@ -47,7 +47,7 @@ export async function registerDonor(data: DonorRegistrationInput): Promise<Donor
         isItEmployee: data.isItEmployee,
         lastDonationDate: data.lastDonationDate,
         nextEligibleDate: nextEligibleDate.toISOString().split("T")[0],
-        occupation: data.companyName,
+        occupation: data.companyName?.trim() || null,
         consentToContact: data.consentToContact,
         donorStatus: "PENDING",
         verificationStatus: "UNVERIFIED",
