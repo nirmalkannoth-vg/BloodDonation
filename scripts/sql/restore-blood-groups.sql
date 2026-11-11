@@ -1,7 +1,7 @@
 -- =============================================================================
 -- RESTORE BLOOD GROUPS MASTER DATA
 -- =============================================================================
--- Run this in: Supabase Dashboard → SQL Editor
+-- Run this in: Neon Console → SQL Editor
 --
 -- Restores the 8 standard blood group records required for the app to work.
 -- Safe to run multiple times — ON CONFLICT DO NOTHING skips existing rows.

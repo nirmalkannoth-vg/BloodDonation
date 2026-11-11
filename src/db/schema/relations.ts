@@ -3,6 +3,7 @@ import { bloodGroups } from "./blood-groups";
 import { donors } from "./donors";
 import { bloodRequests } from "./blood-requests";
 import { adminUsers } from "./admin-users";
+import { adminSessions } from "./admin-sessions";
 import { content } from "./content";
 import { notifications } from "./notifications";
 import { settings } from "./settings";
@@ -51,6 +52,7 @@ export const contentRelations = relations(content, ({ one }) => ({
 }));
 
 export const adminUsersRelations = relations(adminUsers, ({ many }) => ({
+  sessions: many(adminSessions),
   notifications: many(notifications),
   auditLogs: many(auditLogs),
   createdDonors: many(donors, { relationName: "donorCreatedBy" }),
@@ -77,6 +79,13 @@ export const settingsRelations = relations(settings, ({ one }) => ({
 export const auditLogsRelations = relations(auditLogs, ({ one }) => ({
   admin: one(adminUsers, {
     fields: [auditLogs.adminId],
+    references: [adminUsers.id],
+  }),
+}));
+
+export const adminSessionsRelations = relations(adminSessions, ({ one }) => ({
+  admin: one(adminUsers, {
+    fields: [adminSessions.adminId],
     references: [adminUsers.id],
   }),
 }));

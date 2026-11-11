@@ -1,6 +1,6 @@
 -- Fix nextEligibleDate for all donors where it is NULL or outdated.
 -- This recalculates nextEligibleDate as lastDonationDate + 90 days.
--- Run this once in the Supabase SQL Editor to fix existing donor records.
+-- Run this once in the Neon SQL Editor to fix existing donor records.
 
 UPDATE donors
 SET next_eligible_date = (last_donation_date::date + INTERVAL '90 days')::date

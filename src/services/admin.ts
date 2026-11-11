@@ -9,7 +9,11 @@ import {
   auditLogs,
   settings,
 } from "@/db/schema";
-import { eq, and, sql, desc, ilike, or, lte, gte, count } from "drizzle-orm";
+import { eq, and, sql, desc, ilike, or, lte, gte, count, getTableColumns } from "drizzle-orm";
+
+// All admin_users columns except the password hash — never expose that to pages
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const { passwordHash: _passwordHash, ...publicAdminColumns } = getTableColumns(adminUsers);
 import type {
   PaginationParams,
   PaginatedResult,
@@ -359,11 +363,15 @@ export async function getUnreadNotificationCount(adminId?: string) {
 }
 
 export async function getAdminUsers() {
-  return db.select().from(adminUsers).orderBy(desc(adminUsers.createdAt));
+  return db.select(publicAdminColumns).from(adminUsers).orderBy(desc(adminUsers.createdAt));
 }
 
 export async function getAdminUserById(id: string) {
-  const [admin] = await db.select().from(adminUsers).where(eq(adminUsers.id, id)).limit(1);
+  const [admin] = await db
+    .select(publicAdminColumns)
+    .from(adminUsers)
+    .where(eq(adminUsers.id, id))
+    .limit(1);
   return admin || null;
 }
 
@@ -373,7 +381,7 @@ export async function getAuditLogs(pagination: PaginationParams) {
     db
       .select({
         log: auditLogs,
-        admin: adminUsers,
+        admin: publicAdminColumns,
       })
       .from(auditLogs)
       .leftJoin(adminUsers, eq(auditLogs.adminId, adminUsers.id))

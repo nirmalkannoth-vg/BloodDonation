@@ -15,7 +15,12 @@ export function LoginForm() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const searchParams = useSearchParams();
-  const redirectTo = searchParams.get("redirect") || "/admin/dashboard";
+  const requested = searchParams.get("redirect");
+  // Only allow same-site admin paths (prevents open redirects like //evil.com)
+  const redirectTo =
+    requested && requested.startsWith("/admin") && !requested.startsWith("//")
+      ? requested
+      : "/admin/dashboard";
 
   const {
     register,

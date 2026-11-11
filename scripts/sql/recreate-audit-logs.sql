@@ -1,7 +1,7 @@
 -- =============================================================================
 -- RECREATE audit_logs TABLE
 -- =============================================================================
--- Run this in: Supabase Dashboard → SQL Editor
+-- Run this in: Neon Console → SQL Editor
 --
 -- Use this if the audit_logs table was accidentally dropped.
 -- Safe to run even if parts (like the enum) already exist.

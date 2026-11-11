@@ -1,7 +1,7 @@
 -- =============================================================================
 -- DELETE ALL MOCK / SEED DATA
 -- =============================================================================
--- Run this in: Supabase Dashboard → SQL Editor
+-- Run this in: Neon Console → SQL Editor
 --
 -- PURPOSE:
 --   Removes all sample data created by the development seed script.

@@ -1,11 +1,11 @@
 -- =============================================================================
 -- RESTORE ALL MASTER / REFERENCE DATA
 -- =============================================================================
--- Run this in: Supabase Dashboard → SQL Editor
+-- Run this in: Neon Console → SQL Editor
 --
 -- Restores ALL required reference data in one script:
 --   1. blood_groups  (8 rows — required for donors, requests, availability)
---   2. settings      (13 rows — required for NGO info, public pages, rules)
+--   2. settings      (15 rows — required for NGO info, public pages, rules)
 --
 -- WHAT THIS DOES NOT TOUCH:
 --   ✓ admin_users    — your real admin accounts are preserved
@@ -48,6 +48,8 @@ VALUES
   ('SOCIAL_FACEBOOK',                   '',                                                                                                                                                                        'string'),
   ('SOCIAL_TWITTER',                    '',                                                                                                                                                                        'string'),
   ('SOCIAL_INSTAGRAM',                  '',                                                                                                                                                                        'string'),
+  ('SOCIAL_YOUTUBE',                    '',                                                                                                                                                                        'string'),
+  ('SOCIAL_LINKEDIN',                   '',                                                                                                                                                                        'string'),
   ('DONATION_ELIGIBILITY_INTERVAL_DAYS','90',                                                                                                                                                                      'string'),
   ('PUBLIC_BLOOD_AVAILABILITY_ENABLED', 'true',                                                                                                                                                                    'string')
 ON CONFLICT (key) DO NOTHING;
@@ -65,4 +67,4 @@ ORDER BY table_name;
 
 -- Expected result:
 --   blood_groups  │  8
---   settings      │  13
+--   settings      │  15

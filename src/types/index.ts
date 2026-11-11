@@ -98,11 +98,11 @@ export interface Content {
 
 export interface AdminUser {
   id: string;
-  authUserId: string;
   email: string;
   fullName: string;
   role: AdminRole;
   isActive: boolean;
+  lastLoginAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
