@@ -6,7 +6,8 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { Heart, Menu, X } from "lucide-react";
+import { Droplet, Menu, X } from "lucide-react";
+import { BrandLogo } from "./brand-logo";
 
 const navigation = [
   { name: "Home", href: "/" },
@@ -17,73 +18,65 @@ const navigation = [
   { name: "Contact", href: "/contact" },
 ];
 
+function BecomeDonorButton({ className, onClick }: { className?: string; onClick?: () => void }) {
+  return (
+    <Button asChild className={cn("h-10 rounded-lg px-5 font-semibold shadow-sm", className)}>
+      <Link href="/donate" onClick={onClick}>
+        <Droplet className="w-4 h-4" fill="currentColor" />
+        Become a Donor
+      </Link>
+    </Button>
+  );
+}
+
 export function PublicNavbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const pathname = usePathname();
 
   return (
-    <header className="sticky top-0 z-50 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80 border-b">
+    <header className="sticky top-0 z-50 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/85 border-b border-gray-100">
       <nav className="container mx-auto px-4 lg:px-6">
-        <div className="flex items-center justify-between h-16">
-          {/* Logo */}
-          <Link href="/" className="flex items-center gap-2">
-            <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center">
-              <Heart className="w-6 h-6 text-white" fill="currentColor" />
-            </div>
-            <div>
-              <span className="font-bold text-xl text-gray-900">Blood Connect</span>
-              <span className="text-xs font-bold text-primary tracking-wide block mt-0.5">InfoPark News Initiate - Kochi</span>
-            </div>
-          </Link>
+        <div className="flex items-center justify-between h-[4.5rem]">
+          <BrandLogo />
 
           {/* Desktop navigation */}
-          <div className="hidden lg:flex items-center gap-1">
-            {navigation.map((item) => (
-              <Link
-                key={item.name}
-                href={item.href}
-                className={cn(
-                  "px-3 py-2 text-sm font-medium rounded-lg transition-colors",
-                  pathname === item.href
-                    ? "text-primary bg-primary/5"
-                    : "text-gray-700 hover:text-primary hover:bg-gray-50"
-                )}
-              >
-                {item.name}
-              </Link>
-            ))}
+          <div className="hidden lg:flex items-center gap-7">
+            {navigation.map((item) => {
+              const active = pathname === item.href;
+              return (
+                <Link
+                  key={item.name}
+                  href={item.href}
+                  aria-current={active ? "page" : undefined}
+                  className={cn(
+                    "relative py-2 text-[13px] font-medium transition-colors",
+                    active ? "text-primary font-semibold" : "text-gray-700 hover:text-primary"
+                  )}
+                >
+                  {item.name}
+                  {active && (
+                    <span className="absolute left-0 right-0 -bottom-1 h-0.5 rounded-full bg-primary" />
+                  )}
+                </Link>
+              );
+            })}
           </div>
 
-          {/* CTA Button */}
-          <div className="hidden lg:flex items-center gap-3">
-            <Button asChild>
-              <Link href="/donate">Become a Donor</Link>
-            </Button>
+          <div className="hidden lg:block">
+            <BecomeDonorButton />
           </div>
 
-          {/* Mobile menu button */}
+          {/* Mobile menu */}
           <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
             <SheetTrigger asChild>
               <Button variant="ghost" size="icon" className="lg:hidden">
-                {mobileMenuOpen ? (
-                  <X className="w-5 h-5" />
-                ) : (
-                  <Menu className="w-5 h-5" />
-                )}
+                {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
                 <span className="sr-only">Toggle menu</span>
               </Button>
             </SheetTrigger>
             <SheetContent side="right" className="w-full max-w-xs">
               <div className="flex flex-col h-full">
-                <div className="flex items-center gap-2 mb-8">
-                  <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center">
-                    <Heart className="w-6 h-6 text-white" fill="currentColor" />
-                  </div>
-                  <div>
-                    <span className="font-bold text-xl text-gray-900 block">Blood Connect</span>
-                    <span className="text-xs font-bold text-primary tracking-wide block mt-0.5">InfoPark News Initiate - Kochi</span>
-                  </div>
-                </div>
+                <BrandLogo className="mb-8" onClick={() => setMobileMenuOpen(false)} />
 
                 <nav className="flex flex-col w-full gap-1">
                   {navigation.map((item) => (
@@ -104,11 +97,7 @@ export function PublicNavbar() {
                 </nav>
 
                 <div className="mt-auto pt-6 border-t">
-                  <Button asChild className="w-full">
-                    <Link href="/donate" onClick={() => setMobileMenuOpen(false)}>
-                      Become a Donor
-                    </Link>
-                  </Button>
+                  <BecomeDonorButton className="w-full" onClick={() => setMobileMenuOpen(false)} />
                 </div>
               </div>
             </SheetContent>

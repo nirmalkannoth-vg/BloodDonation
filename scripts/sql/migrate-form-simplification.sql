@@ -1,7 +1,7 @@
 -- =============================================================================
 -- FORM SIMPLIFICATION MIGRATION
 -- =============================================================================
--- Run this ONCE in Supabase Dashboard → SQL Editor BEFORE deploying the
+-- Run this ONCE in Neon Console → SQL Editor BEFORE deploying the
 -- updated application code.
 --
 -- WHAT THIS DOES:

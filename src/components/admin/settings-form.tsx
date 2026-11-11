@@ -149,7 +149,7 @@ export function SettingsForm({ settings, isSuperAdmin }: SettingsFormProps) {
       <Card>
         <CardHeader>
           <CardTitle>Social Media</CardTitle>
-          <CardDescription>Social media profile links</CardDescription>
+          <CardDescription>Social media profile links (shown as icons in the website footer when set)</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -178,6 +178,24 @@ export function SettingsForm({ settings, isSuperAdmin }: SettingsFormProps) {
                 value={formData.SOCIAL_INSTAGRAM || ""}
                 onChange={(e) => handleChange("SOCIAL_INSTAGRAM", e.target.value)}
                 placeholder="https://instagram.com/..."
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="SOCIAL_YOUTUBE">YouTube</Label>
+              <Input
+                id="SOCIAL_YOUTUBE"
+                value={formData.SOCIAL_YOUTUBE || ""}
+                onChange={(e) => handleChange("SOCIAL_YOUTUBE", e.target.value)}
+                placeholder="https://youtube.com/@..."
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="SOCIAL_LINKEDIN">LinkedIn</Label>
+              <Input
+                id="SOCIAL_LINKEDIN"
+                value={formData.SOCIAL_LINKEDIN || ""}
+                onChange={(e) => handleChange("SOCIAL_LINKEDIN", e.target.value)}
+                placeholder="https://linkedin.com/company/..."
               />
             </div>
           </div>

@@ -1,8 +1,6 @@
-import { createClient } from "@/lib/supabase/server";
-import { db } from "@/db";
-import { adminUsers } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { cache } from "react";
 import { redirect } from "next/navigation";
+import { lookupSession, destroySession } from "./session";
 import type { AdminRole } from "@/types";
 
 export interface AdminSession {
@@ -19,79 +17,33 @@ export interface AdminSession {
   };
 }
 
-export async function getSession(): Promise<AdminSession | null> {
-  const supabase = await createClient();
-  
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
+// Deduplicated per request (layout + page both call this)
+const getLookup = cache(lookupSession);
 
-  if (error || !user) {
-    return null;
-  }
-
-  // Get admin user from database
-  const [admin] = await db
-    .select()
-    .from(adminUsers)
-    .where(eq(adminUsers.authUserId, user.id))
-    .limit(1);
-
-  if (!admin || !admin.isActive) {
-    return null;
-  }
-
+function toSession(admin: AdminSession["admin"]): AdminSession {
   return {
-    user: {
-      id: user.id,
-      email: user.email!,
-    },
-    admin: {
-      id: admin.id,
-      email: admin.email,
-      fullName: admin.fullName,
-      role: admin.role as AdminRole,
-      isActive: admin.isActive,
-    },
+    user: { id: admin.id, email: admin.email },
+    admin: { ...admin, role: admin.role as AdminRole },
   };
 }
 
+export async function getSession(): Promise<AdminSession | null> {
+  const result = await getLookup();
+  return result.status === "active" ? toSession(result.admin) : null;
+}
+
 export async function requireAdmin(): Promise<AdminSession> {
-  const supabase = await createClient();
+  const result = await getLookup();
 
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-
-  if (error || !user) {
+  if (result.status === "none") {
     redirect("/admin/login");
   }
 
-  const [admin] = await db
-    .select()
-    .from(adminUsers)
-    .where(eq(adminUsers.authUserId, user.id))
-    .limit(1);
-
-  if (!admin || !admin.isActive) {
+  if (result.status === "inactive") {
     redirect("/admin/unauthorized");
   }
 
-  return {
-    user: {
-      id: user.id,
-      email: user.email!,
-    },
-    admin: {
-      id: admin.id,
-      email: admin.email,
-      fullName: admin.fullName,
-      role: admin.role as AdminRole,
-      isActive: admin.isActive,
-    },
-  };
+  return toSession(result.admin);
 }
 
 export async function requireSuperAdmin(): Promise<AdminSession> {
@@ -114,7 +66,7 @@ export function hasPermission(
   return session.admin.role === requiredRole;
 }
 
+/** Must be called from a Server Action or Route Handler. */
 export async function signOut() {
-  const supabase = await createClient();
-  await supabase.auth.signOut();
+  await destroySession();
 }

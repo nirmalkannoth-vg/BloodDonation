@@ -1,15 +1,24 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
 import { db } from "@/db";
 import { adminUsers, auditLogs } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { loginSchema, type LoginInput } from "@/lib/validations/auth";
 import { headers } from "next/headers";
+import { hashPassword, verifyPassword } from "@/lib/auth/password";
+import { createSession, destroySession } from "@/lib/auth/session";
+import { checkRateLimit } from "@/lib/security/rate-limit";
 
 export interface AuthResult {
   success: boolean;
   error?: string;
+}
+
+// Used when the email doesn't exist so response time doesn't reveal valid accounts
+let dummyHash: Promise<string> | null = null;
+function getDummyHash() {
+  dummyHash ??= hashPassword("not-a-real-password");
+  return dummyHash;
 }
 
 export async function signIn(data: LoginInput): Promise<AuthResult> {
@@ -23,82 +32,86 @@ export async function signIn(data: LoginInput): Promise<AuthResult> {
       };
     }
 
-    const supabase = await createClient();
+    const email = validation.data.email.trim().toLowerCase();
+    const { password } = validation.data;
 
-    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-      email: data.email,
-      password: data.password,
+    const headersList = await headers();
+    const ip = (headersList.get("x-forwarded-for") || headersList.get("x-real-ip") || "unknown")
+      .split(",")[0]
+      .trim();
+    const userAgent = headersList.get("user-agent");
+
+    const rateLimit = await checkRateLimit(`login:${ip}:${email}`, {
+      maxRequests: 5,
+      windowMs: 15 * 60 * 1000,
     });
-
-    if (authError) {
+    if (!rateLimit.success) {
       return {
         success: false,
-        error: "Invalid email or password",
+        error: "Too many login attempts. Please try again in a few minutes.",
       };
     }
 
-    if (!authData.user) {
-      return {
-        success: false,
-        error: "Authentication failed",
-      };
-    }
-
-    // Verify user is an admin
     let admin;
     try {
       const result = await db
         .select()
         .from(adminUsers)
-        .where(eq(adminUsers.authUserId, authData.user.id))
+        .where(eq(sql`lower(${adminUsers.email})`, email))
         .limit(1);
       admin = result[0];
     } catch {
-      try { await supabase.auth.signOut(); } catch { /* ignore */ }
       return {
         success: false,
         error: "Unable to verify admin access. Please try again.",
       };
     }
 
-    if (!admin) {
-      try { await supabase.auth.signOut(); } catch { /* ignore */ }
+    const passwordOk = await verifyPassword(
+      password,
+      admin?.passwordHash ?? (await getDummyHash())
+    );
+
+    if (!admin || !passwordOk) {
       return {
         success: false,
-        error: "You are not authorized to access the admin panel",
+        error: "Invalid email or password",
       };
     }
 
     if (!admin.isActive) {
-      try { await supabase.auth.signOut(); } catch { /* ignore */ }
       return {
         success: false,
         error: "Your admin account has been deactivated",
       };
     }
 
-    // Log the login action — non-blocking, never fail the login if audit log fails
+    await createSession(admin.id, { ipAddress: ip, userAgent });
+
+    // Bookkeeping — non-blocking, never fail the login if these fail
     try {
-      const headersList = await headers();
-      const ip = headersList.get("x-forwarded-for") || headersList.get("x-real-ip") || "unknown";
+      await db
+        .update(adminUsers)
+        .set({ lastLoginAt: new Date() })
+        .where(eq(adminUsers.id, admin.id));
       await db.insert(auditLogs).values({
         adminId: admin.id,
         action: "ADMIN_LOGIN",
         entityType: "admin_user",
         entityId: admin.id,
-        ipAddress: ip.split(",")[0].trim(),
+        ipAddress: ip,
         metadata: {
           email: admin.email,
-          userAgent: headersList.get("user-agent"),
+          userAgent,
         },
       });
     } catch {
-      // Audit log failure should never block a successful login
+      // ignore
     }
 
     return { success: true };
   } catch (err) {
-    if (err && typeof err === 'object' && 'digest' in err) throw err;
+    if (err && typeof err === "object" && "digest" in err) throw err;
     return {
       success: false,
       error: "An error occurred during sign in. Please try again.",
@@ -107,6 +120,5 @@ export async function signIn(data: LoginInput): Promise<AuthResult> {
 }
 
 export async function signOut(): Promise<void> {
-  const supabase = await createClient();
-  await supabase.auth.signOut();
+  await destroySession();
 }

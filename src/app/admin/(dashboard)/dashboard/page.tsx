@@ -8,7 +8,7 @@ import {
   getRequestsByStatus,
   getUnreadNotificationCount,
 } from "@/services/admin";
-import { getSession } from "@/lib/auth";
+import { requireAdmin } from "@/lib/auth";
 import {
   Users,
   UserCheck,
@@ -26,7 +26,7 @@ export const metadata: Metadata = {
 };
 
 export default async function AdminDashboardPage() {
-  const session = (await getSession())!;
+  const session = await requireAdmin();
 
   const [stats, bloodGroupStats, monthlyRegistrations, requestsByStatus, unreadCount] =
     await Promise.all([

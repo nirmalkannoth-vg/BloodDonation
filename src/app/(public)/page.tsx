@@ -1,8 +1,15 @@
+import { existsSync } from "node:fs";
+import path from "node:path";
 import { Metadata } from "next";
-import { HeroSection, CTASection } from "@/components/public/hero-section";
+import {
+  HeroSection,
+  ImpactStatsSection,
+  HowItWorksSection,
+  CTASection,
+  HERO_IMAGE_SRC,
+} from "@/components/public/hero-section";
 import { BloodAvailabilitySection } from "@/components/public/blood-availability";
-import { ContentSection } from "@/components/public/content-section";
-import { getPublicBloodAvailability, getPublishedContent } from "@/services/public";
+import { getPublicBloodAvailability } from "@/services/public";
 
 export const metadata: Metadata = {
   title: "Blood Connect - Donate Blood, Save Lives",
@@ -13,16 +20,16 @@ export const metadata: Metadata = {
 export const dynamic = 'force-dynamic';
 
 export default async function HomePage() {
-  const [availability, content] = await Promise.all([
-    getPublicBloodAvailability(),
-    getPublishedContent(undefined, 6),
-  ]);
+  const availability = await getPublicBloodAvailability();
+  // Show the hero photo once it has been added to /public; otherwise fall back to SVG art
+  const hasHeroImage = existsSync(path.join(process.cwd(), "public", HERO_IMAGE_SRC));
 
   return (
     <>
-      <HeroSection />
+      <HeroSection hasHeroImage={hasHeroImage} />
       <BloodAvailabilitySection availability={availability} />
-      <ContentSection content={content} />
+      <ImpactStatsSection />
+      <HowItWorksSection />
       <CTASection />
     </>
   );

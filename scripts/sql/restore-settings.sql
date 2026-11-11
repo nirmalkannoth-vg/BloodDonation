@@ -1,7 +1,7 @@
 -- =============================================================================
 -- RESTORE DEFAULT APPLICATION SETTINGS
 -- =============================================================================
--- Run this in: Supabase Dashboard → SQL Editor
+-- Run this in: Neon Console → SQL Editor
 --
 -- Restores the default settings rows required for the app to work correctly.
 -- Safe to run multiple times — ON CONFLICT DO NOTHING skips existing rows.
@@ -24,6 +24,8 @@ VALUES
   ('SOCIAL_FACEBOOK',                   '',                                                                                                                                                                        'string'),
   ('SOCIAL_TWITTER',                    '',                                                                                                                                                                        'string'),
   ('SOCIAL_INSTAGRAM',                  '',                                                                                                                                                                        'string'),
+  ('SOCIAL_YOUTUBE',                    '',                                                                                                                                                                        'string'),
+  ('SOCIAL_LINKEDIN',                   '',                                                                                                                                                                        'string'),
   ('DONATION_ELIGIBILITY_INTERVAL_DAYS','90',                                                                                                                                                                      'string'),
   ('PUBLIC_BLOOD_AVAILABILITY_ENABLED', 'true',                                                                                                                                                                    'string')
 ON CONFLICT (key) DO NOTHING;

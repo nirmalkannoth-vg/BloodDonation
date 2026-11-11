@@ -114,19 +114,14 @@ export default async function AdminUsersPage() {
         </CardHeader>
         <CardContent>
           <p className="text-sm text-gray-600 mb-4">
-            To create a new admin user:
+            To create a new admin user (or reset a password), run this from the project folder:
           </p>
-          <ol className="list-decimal list-inside space-y-2 text-sm text-gray-600">
-            <li>Create a user in Supabase Authentication dashboard</li>
-            <li>Note the user&apos;s UUID from the Auth Users table</li>
-            <li>
-              Insert a record into the <code className="bg-gray-100 px-1 rounded">admin_users</code> table with the auth_user_id
-            </li>
-            <li>Set the appropriate role (SUPER_ADMIN or ADMIN)</li>
-          </ol>
+          <pre className="bg-gray-100 rounded p-3 text-xs overflow-x-auto">
+            npm run script:create-admin -- &quot;email&quot; &quot;Full Name&quot; &quot;password&quot; [ADMIN|SUPER_ADMIN]
+          </pre>
           <p className="text-xs text-gray-500 mt-4">
-            Direct admin creation UI is planned for a future update. For now,
-            please use the Supabase dashboard.
+            Passwords must be at least 8 characters and are stored as secure hashes in the
+            database. Direct admin creation UI is planned for a future update.
           </p>
         </CardContent>
       </Card>

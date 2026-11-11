@@ -1,7 +1,7 @@
 -- =============================================================================
 -- REBRAND: LifeBlood Foundation → Blood Connect
 -- =============================================================================
--- Run this in: Supabase Dashboard → SQL Editor
+-- Run this in: Neon Console → SQL Editor
 --
 -- PURPOSE:
 --   Updates the NGO_NAME, NGO_DESCRIPTION, CONTACT_EMAIL, ADDRESS, CITY, and

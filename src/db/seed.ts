@@ -319,9 +319,8 @@ async function seed() {
   console.log(`   - Notifications: ${notificationRecords.length}`);
   console.log("\n⚠️  Note: This is development seed data. Do not use in production.\n");
   console.log("📝 Next steps:");
-  console.log("   1. Create a Supabase Auth user for admin access");
-  console.log("   2. Insert an admin_users record linking to the auth user");
-  console.log("   3. See README.md for detailed instructions\n");
+  console.log('   1. Create an admin: npm run script:create-admin -- "email" "Full Name" "password" SUPER_ADMIN');
+  console.log("   2. See README.md for detailed instructions\n");
 
   await client.end();
 }

@@ -1,6 +1,6 @@
 # Blood Donation NGO Management Platform
 
-A production-ready Blood Donation NGO Management Platform built with Next.js 16, TypeScript, Supabase, and Drizzle ORM. This platform provides a public website for blood availability and donor registration, alongside a comprehensive admin dashboard for managing donors, blood requests, content, and more.
+A production-ready Blood Donation NGO Management Platform built with Next.js 16, TypeScript, Neon Postgres, and Drizzle ORM. This platform provides a public website for blood availability and donor registration, alongside a comprehensive admin dashboard for managing donors, blood requests, content, and more.
 
 ## Features
 
@@ -27,9 +27,9 @@ A production-ready Blood Donation NGO Management Platform built with Next.js 16,
 
 - **Framework**: Next.js 16 (App Router, Server Components, Server Actions)
 - **Language**: TypeScript (Strict Mode)
-- **Database**: PostgreSQL (via Supabase)
+- **Database**: PostgreSQL (via Neon)
 - **ORM**: Drizzle ORM
-- **Authentication**: Supabase Auth
+- **Authentication**: Email/password with database-backed sessions (scrypt hashes, httpOnly cookie)
 - **UI Components**: shadcn/ui with Base UI
 - **Styling**: Tailwind CSS 4
 - **Forms**: React Hook Form + Zod validation
@@ -58,11 +58,9 @@ blood-donation-ngo/
 │   │   ├── seed.ts             # Development seed data
 │   │   └── index.ts            # Database client
 │   ├── lib/
-│   │   ├── auth/               # Auth utilities
+│   │   ├── auth/               # Password hashing, sessions, admin guards
 │   │   ├── validations/        # Zod schemas
-│   │   ├── security/           # Rate limiting
-│   │   └── supabase/           # Supabase clients
-│   ├── hooks/                  # React hooks
+│   │   └── security/           # Rate limiting
 │   ├── types/                  # TypeScript types
 │   └── config/                 # App configuration
 ├── public/                     # Static assets
@@ -75,7 +73,7 @@ blood-donation-ngo/
 
 - Node.js 18.17 or later
 - npm or pnpm
-- A Supabase project (free tier works)
+- A Neon project (free tier works)
 
 ## Getting Started
 
@@ -92,14 +90,10 @@ cd blood-donation-ngo
 npm install
 ```
 
-### 3. Set Up Supabase
+### 3. Set Up Neon
 
-1. Create a new project at [supabase.com](https://supabase.com)
-2. Go to **Settings > API** and copy:
-   - Project URL
-   - Anon (public) key
-   - Service Role key (keep this secret!)
-3. Go to **Settings > Database** and copy the connection string
+1. Create a new project at [neon.tech](https://neon.tech)
+2. Click **Connect** and copy the **pooled** connection string (host contains `-pooler`)
 
 ### 4. Configure Environment Variables
 
@@ -109,16 +103,11 @@ Copy the example environment file:
 cp .env.example .env.local
 ```
 
-Update `.env.local` with your Supabase credentials:
+Update `.env.local` with your Neon connection string:
 
 ```bash
-# Supabase (Public - safe for client)
-NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
-
-# Supabase (Server-only - NEVER expose to client)
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
-DATABASE_URL=postgresql://postgres:[password]@db.[project-ref].supabase.co:5432/postgres
+# Neon Postgres (Server-only - NEVER expose to client)
+DATABASE_URL=postgresql://[user]:[password]@[endpoint]-pooler.[region].aws.neon.tech/neondb?sslmode=require&channel_binding=require
 
 # Optional: Rate limiting (Upstash Redis)
 # UPSTASH_REDIS_REST_URL=
@@ -141,17 +130,13 @@ npm run db:seed
 
 ### 6. Create Your First Admin User
 
-1. Go to your Supabase project dashboard
-2. Navigate to **Authentication > Users**
-3. Click **Add user** and create a user with email and password
-4. Copy the user's UUID from the user list
-5. Go to **Table Editor > admin_users**
-6. Insert a new row:
-   - `auth_user_id`: The UUID from step 4
-   - `email`: The same email used in step 3
-   - `full_name`: Your name
-   - `role`: `SUPER_ADMIN`
-   - `is_active`: `true`
+```bash
+npm run script:create-admin -- "<email>" "<full_name>" "<password>" SUPER_ADMIN
+```
+
+The password (min. 8 characters) is stored as a scrypt hash in `admin_users`.
+Re-running the command with the same email updates the name/role and resets the password.
+See [scripts/README.md](scripts/README.md) for details.
 
 ### 7. Start Development Server
 
@@ -187,7 +172,8 @@ Visit:
 | `donors` | Registered blood donors |
 | `blood_requests` | Blood request submissions |
 | `content` | Health awareness content items |
-| `admin_users` | Admin dashboard users |
+| `admin_users` | Admin dashboard users (email + password hash) |
+| `admin_sessions` | Active admin login sessions (hashed tokens) |
 | `notifications` | System notifications |
 | `settings` | Application configuration |
 | `audit_logs` | Action audit trail |
@@ -209,10 +195,12 @@ Visit:
 - Donor details are only accessible to authenticated admins
 
 ### Authentication & Authorization
-- Supabase Auth for secure authentication
+- Email/password login; passwords hashed with scrypt (Node `crypto`)
+- Sessions stored in the `admin_sessions` table; the browser only holds a random token in an httpOnly, SameSite=Lax cookie (7-day expiry), and only its SHA-256 hash is stored
+- Login attempts rate-limited per IP + email
 - Role-based access control (ADMIN, SUPER_ADMIN)
-- Server-side session validation on all admin routes
-- Middleware protection for admin routes
+- Server-side session validation on all admin routes (`requireAdmin()`)
+- Proxy (`src/proxy.ts`) redirects to login when no session cookie is present
 
 ### Data Validation
 - Zod schemas for all form inputs
@@ -234,9 +222,6 @@ Visit:
 1. Push your code to GitHub
 2. Import project to [Vercel](https://vercel.com)
 3. Add environment variables in Vercel dashboard:
-   - `NEXT_PUBLIC_SUPABASE_URL`
-   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-   - `SUPABASE_SERVICE_ROLE_KEY`
    - `DATABASE_URL`
 4. Deploy!
 
@@ -248,35 +233,14 @@ Visit:
 - [ ] Blood groups are seeded
 - [ ] Default settings are configured
 - [ ] Custom domain is configured (optional)
-- [ ] Enable Supabase RLS policies (see below)
+- [ ] `DATABASE_URL` is kept server-only (never prefixed with `NEXT_PUBLIC_`)
 
-### Supabase Row Level Security (RLS)
+### Database Access
 
-For production, enable RLS policies in Supabase:
-
-```sql
--- Enable RLS on all tables
-ALTER TABLE donors ENABLE ROW LEVEL SECURITY;
-ALTER TABLE blood_requests ENABLE ROW LEVEL SECURITY;
-ALTER TABLE content ENABLE ROW LEVEL SECURITY;
-ALTER TABLE admin_users ENABLE ROW LEVEL SECURITY;
-ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
-ALTER TABLE settings ENABLE ROW LEVEL SECURITY;
-ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
-
--- Allow public read of published content
-CREATE POLICY "Public can read published content"
-ON content FOR SELECT
-USING (status = 'PUBLISHED');
-
--- Allow public read of blood groups
-CREATE POLICY "Public can read blood groups"
-ON blood_groups FOR SELECT
-USING (true);
-
--- Service role has full access (for server-side operations)
--- Note: These use the service role key which bypasses RLS
-```
+The database lives in Neon and is only reachable through `DATABASE_URL` from server code
+(Server Components, Server Actions, scripts). It is not exposed through a public REST API,
+so row-level security policies are not required. Keep the connection string secret and
+rotate the password from the Neon dashboard if it is ever leaked.
 
 ## Configuration
 
@@ -292,6 +256,15 @@ Settings are stored in the `settings` table and can be managed via the admin das
 | `CONTACT_PHONE` | Contact phone number | - |
 | `CONTACT_ADDRESS` | Physical address | - |
 | `DONATION_ELIGIBILITY_INTERVAL_DAYS` | Days between donations | 90 |
+
+### Landing Page Images
+
+The home page hero shows `public/images/hero-donor.png` if it exists (landscape, ~1600×1000,
+on a flat `#F0F0F1` background — the hero section uses the same colour so the photo blends in).
+Until it is added, an SVG blood-drop illustration is shown instead. No restart is needed.
+
+Footer social icons (Facebook, YouTube, LinkedIn, Instagram, X) only appear for links set in
+**Admin → Settings → Social Media**.
 
 ### Design System
 

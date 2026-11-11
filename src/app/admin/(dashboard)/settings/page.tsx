@@ -1,5 +1,5 @@
 import { Metadata } from "next";
-import { getSession } from "@/lib/auth";
+import { requireAdmin } from "@/lib/auth";
 import { getAllSettings as getAdminSettings } from "@/services/admin";
 import { SettingsForm } from "@/components/admin/settings-form";
 
@@ -8,7 +8,7 @@ export const metadata: Metadata = {
 };
 
 export default async function SettingsPage() {
-  const session = (await getSession())!;
+  const session = await requireAdmin();
   const settings = await getAdminSettings();
 
   const isSuperAdmin = session.admin.role === "SUPER_ADMIN";
